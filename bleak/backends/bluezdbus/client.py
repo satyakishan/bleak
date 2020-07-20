@@ -515,9 +515,15 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 )
             )
 
-        body = {"offset": kwargs.get("offset", None)}
-        if self._bluez_version[0] == 5 and self._bluez_version[1] >= 51:
-            body["mtu"] = kwargs.get("mtu", None)
+        body = {}
+        if kwargs.get("offset", None):
+            body["offset"] = int(kwargs.get("offset"))
+        if (
+            kwargs.get("mtu", None)
+            and self._bluez_version[0] == 5
+            and self._bluez_version[1] >= 51
+        ):
+            body["mtu"] = int(kwargs.get("mtu"))
 
         value = bytearray(
             await self._bus.callRemote(
@@ -634,9 +640,16 @@ class BleakClientBlueZDBus(BaseBleakClient):
         if response or (self._bluez_version[0] == 5 and self._bluez_version[1] > 50):
             # TODO: Add OnValueUpdated handler for response=True?
 
-            body = {"offset": kwargs.get("offset", None)}
-            if self._bluez_version[0] == 5 and self._bluez_version[1] >= 51:
-                body["mtu"] = kwargs.get("mtu", None)
+            body = {}
+            if kwargs.get("offset", None):
+                body["offset"] = int(kwargs.get("offset"))
+            if (
+                kwargs.get("mtu", None)
+                and self._bluez_version[0] == 5
+                and self._bluez_version[1] >= 51
+            ):
+                body["mtu"] = int(kwargs.get("mtu"))
+
             await self._bus.callRemote(
                 characteristic.path,
                 "WriteValue",
