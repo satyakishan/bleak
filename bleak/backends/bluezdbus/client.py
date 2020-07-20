@@ -464,6 +464,10 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 specified by either integer handle, UUID or directly by the
                 BleakGATTCharacteristicBlueZDBus object representing it.
 
+        Keyword Args:
+            offset (int): uint16 offset where to start read.
+            mtu (int): Send the Maximum Transmission Unit (MTU) the the peripheral can respond to this read with.
+
         Returns:
             (bytearray) The read data.
 
@@ -511,6 +515,10 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 )
             )
 
+        body = {"offset": kwargs.get("mtu", None)}
+        if self._bluez_version[0] == 5 and self._bluez_version[1] >= 51:
+            body["mtu"] = kwargs.get("mtu", None)
+
         value = bytearray(
             await self._bus.callRemote(
                 characteristic.path,
@@ -518,7 +526,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 interface=defs.GATT_CHARACTERISTIC_INTERFACE,
                 destination=defs.BLUEZ_SERVICE,
                 signature="a{sv}",
-                body=[{}],
+                body=[body],
                 returnSignature="ay",
             ).asFuture(asyncio.get_event_loop())
         )
@@ -566,6 +574,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
         char_specifier: Union[BleakGATTCharacteristicBlueZDBus, int, str, uuid.UUID],
         data: bytearray,
         response: bool = False,
+        **kwargs
     ) -> None:
         """Perform a write operation on the specified GATT characteristic.
 
@@ -584,6 +593,10 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 BleakGATTCharacteristicBlueZDBus object representing it.
             data (bytes or bytearray): The data to send.
             response (bool): If write-with-response operation should be done. Defaults to `False`.
+
+        Keyword Args:
+            offset (int): uint16 offset where to start write.
+            mtu (int): Send the Maximum Transmission Unit (MTU) the the peripheral should use for receiving this write?
 
         """
         if not isinstance(char_specifier, BleakGATTCharacteristicBlueZDBus):
@@ -620,6 +633,10 @@ class BleakClientBlueZDBus(BaseBleakClient):
             raise BleakError("Write without response requires at least BlueZ 5.46")
         if response or (self._bluez_version[0] == 5 and self._bluez_version[1] > 50):
             # TODO: Add OnValueUpdated handler for response=True?
+
+            body = {"offset": kwargs.get("mtu", None)}
+            if self._bluez_version[0] == 5 and self._bluez_version[1] >= 51:
+                body["mtu"] = kwargs.get("mtu", None)
             await self._bus.callRemote(
                 characteristic.path,
                 "WriteValue",

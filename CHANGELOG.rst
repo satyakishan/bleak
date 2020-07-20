@@ -27,6 +27,11 @@ Added
 * Implemented pairing method in the BlueZ backend.
 * Added stumps and ``NotImplementedError`` on pairing in macOS backend.
 
+Added
+~~~~~
+
+* Keyword arguments ``mtu`` and ``offset`` added for BlueZ backend read and write methods.
+
 Changed
 ~~~~~~~
 * **BREAKING CHANGE** All notifications now have the characteristic's integer **handle** instead of its UUID as a
