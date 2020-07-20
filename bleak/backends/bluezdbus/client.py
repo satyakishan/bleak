@@ -515,7 +515,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 )
             )
 
-        body = {"offset": kwargs.get("mtu", None)}
+        body = {"offset": kwargs.get("offset", None)}
         if self._bluez_version[0] == 5 and self._bluez_version[1] >= 51:
             body["mtu"] = kwargs.get("mtu", None)
 
@@ -634,7 +634,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
         if response or (self._bluez_version[0] == 5 and self._bluez_version[1] > 50):
             # TODO: Add OnValueUpdated handler for response=True?
 
-            body = {"offset": kwargs.get("mtu", None)}
+            body = {"offset": kwargs.get("offset", None)}
             if self._bluez_version[0] == 5 and self._bluez_version[1] >= 51:
                 body["mtu"] = kwargs.get("mtu", None)
             await self._bus.callRemote(
