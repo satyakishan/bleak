@@ -54,6 +54,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
         self._reactor = None
         self._rules = {}
         self._subscriptions = list()
+        self._acquire_notify_file_descriptors = {}
 
         self._disconnected_callback = None
 
@@ -189,23 +190,25 @@ class BleakClientBlueZDBus(BaseBleakClient):
         Remove all pending notifications of the client. This method is used to
         free the DBus matches that have been established.
         """
+        loop = asyncio.get_event_loop()
         for rule_name, rule_id in self._rules.items():
             logger.debug("Removing rule {0}, ID: {1}".format(rule_name, rule_id))
             try:
-                await self._bus.delMatch(rule_id).asFuture(asyncio.get_event_loop())
+                await self._bus.delMatch(rule_id).asFuture(loop)
             except Exception as e:
                 logger.error(
                     "Could not remove rule {0} ({1}): {2}".format(rule_id, rule_name, e)
                 )
         self._rules = {}
 
-        for _uuid in list(self._subscriptions):
+        for handle in list(self._subscriptions):
             try:
-                await self.stop_notify(_uuid)
+                await self.stop_notify(handle)
             except Exception as e:
+                characteristic = self.services.get_characteristic(handle)
                 logger.error(
                     "Could not remove notifications on characteristic {0}: {1}".format(
-                        _uuid, e
+                        characteristic, e
                     )
                 )
         self._subscriptions = []
@@ -728,6 +731,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 notifications/indications on a characteristic, specified by either integer handle,
                 UUID or directly by the BleakGATTCharacteristicBlueZDBus object representing it.
             callback (function): The function to be called on notification.
+            mtu (int): Send the Maximum Transmission Unit (MTU) the the peripheral can send to this client as notification.
 
         Keyword Args:
             notification_wrapper (bool): Set to `False` to avoid parsing of
@@ -766,19 +770,23 @@ class BleakClientBlueZDBus(BaseBleakClient):
             and self._bluez_version[0] == 5
             and self._bluez_version[1] >= 51
         ):
+            loop = asyncio.get_event_loop()
+            mtu = int(kwargs.get("mtu"))
             fd, _ = await self._bus.callRemote(
                 characteristic.path,
                 "AcquireNotify",
                 interface=defs.GATT_CHARACTERISTIC_INTERFACE,
                 destination=defs.BLUEZ_SERVICE,
                 signature="a{sv}",
-                body=[{"mtu": int(kwargs.get("mtu"))}],
+                body=[{"mtu": mtu}],
                 returnSignature="hq",
-            ).asFuture(asyncio.get_event_loop())
+            ).asFuture(loop)
+
             # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.BaseEventLoop.add_reader
-            # TODO: Store fd in dict?
-            #os.write(fd, 1)
-            #os.close(fd)
+            loop.add_reader(fd, _acquire_notify_notification_wrapper(
+                    callback,  mtu, _wrap
+                ), characteristic, fd)
+            self._acquire_notify_file_descriptors[characteristic] = fd
         else:
             await self._bus.callRemote(
                 characteristic.path,
@@ -817,6 +825,7 @@ class BleakClientBlueZDBus(BaseBleakClient):
                 directly by the BleakGATTCharacteristicBlueZDBus object representing it.
 
         """
+        loop = asyncio.get_event_loop()
         if not isinstance(char_specifier, BleakGATTCharacteristicBlueZDBus):
             characteristic = self.services.get_characteristic(char_specifier)
         else:
@@ -824,16 +833,23 @@ class BleakClientBlueZDBus(BaseBleakClient):
         if not characteristic:
             raise BleakError("Characteristic {} not found!".format(char_specifier))
 
-        await self._bus.callRemote(
-            characteristic.path,
-            "StopNotify",
-            interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-            destination=defs.BLUEZ_SERVICE,
-            signature="",
-            body=[],
-            returnSignature="",
-        ).asFuture(asyncio.get_event_loop())
-        self._notification_callbacks.pop(characteristic.path, None)
+        if characteristic in self._acquire_notify_file_descriptors:
+            # AcquireNotify path
+            fd = self._acquire_notify_file_descriptors.pop(characteristic)
+            loop.remove_reader(fd)
+            os.close(fd)
+        else:
+            # StartNotify path
+            await self._bus.callRemote(
+                characteristic.path,
+                "StopNotify",
+                interface=defs.GATT_CHARACTERISTIC_INTERFACE,
+                destination=defs.BLUEZ_SERVICE,
+                signature="",
+                body=[],
+                returnSignature="",
+            ).asFuture(loop)
+            self._notification_callbacks.pop(characteristic.path, None)
 
         self._subscriptions.remove(characteristic.handle)
 
@@ -943,6 +959,16 @@ class BleakClientBlueZDBus(BaseBleakClient):
                         task.add_done_callback(
                             partial(self._disconnected_callback, self)
                         )
+
+
+def _acquire_notify_notification_wrapper(func, mtu, wrap):
+    @wraps(func)
+    def args_parser(sender, fd):
+        data = os.read(fd, mtu)
+        if len(data) > 0:
+            return func(sender, bytearray(data) if wrap else data)
+
+    return args_parser
 
 
 def _data_notification_wrapper(func, char_map):

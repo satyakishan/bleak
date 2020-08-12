@@ -31,6 +31,7 @@ Added
 ~~~~~
 
 * Keyword arguments ``mtu`` and ``offset`` added for BlueZ backend read and write methods.
+* Keyword arguments ``mtu`` added for BlueZ backend notify methods. Added cleanup of these new kinds of notifications also.
 
 Changed
 ~~~~~~~
