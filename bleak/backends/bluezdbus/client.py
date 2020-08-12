@@ -760,15 +760,35 @@ class BleakClientBlueZDBus(BaseBleakClient):
                     char_specifier
                 )
             )
-        await self._bus.callRemote(
-            characteristic.path,
-            "StartNotify",
-            interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-            destination=defs.BLUEZ_SERVICE,
-            signature="",
-            body=[],
-            returnSignature="",
-        ).asFuture(asyncio.get_event_loop())
+
+        if (
+            kwargs.get("mtu", None)
+            and self._bluez_version[0] == 5
+            and self._bluez_version[1] >= 51
+        ):
+            fd, _ = await self._bus.callRemote(
+                characteristic.path,
+                "AcquireNotify",
+                interface=defs.GATT_CHARACTERISTIC_INTERFACE,
+                destination=defs.BLUEZ_SERVICE,
+                signature="a{sv}",
+                body=[{"mtu": int(kwargs.get("mtu"))}],
+                returnSignature="hq",
+            ).asFuture(asyncio.get_event_loop())
+            # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.BaseEventLoop.add_reader
+            # TODO: Store fd in dict?
+            #os.write(fd, 1)
+            #os.close(fd)
+        else:
+            await self._bus.callRemote(
+                characteristic.path,
+                "StartNotify",
+                interface=defs.GATT_CHARACTERISTIC_INTERFACE,
+                destination=defs.BLUEZ_SERVICE,
+                signature="",
+                body=[],
+                returnSignature="",
+            ).asFuture(asyncio.get_event_loop())
 
         if _wrap:
             self._notification_callbacks[
