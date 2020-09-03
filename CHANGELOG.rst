@@ -13,6 +13,12 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Added
 ~~~~~
 
+* Keyword arguments ``mtu`` and ``offset`` added for BlueZ backend read and write methods.
+* Keyword arguments ``mtu`` added for BlueZ backend notify methods. Added cleanup of these new kinds of notifications also.
+
+Added
+~~~~~
+
 * Added ``find_device_by_address`` method to the ``BleakScanner`` interface, for stopping scanning
   when a desired address is found.
 * Implemented ``find_device_by_address`` in the .NET backend ``BleakScanner`` implementation and
@@ -27,11 +33,6 @@ Added
 * Implemented pairing method in the BlueZ backend.
 * Added stumps and ``NotImplementedError`` on pairing in macOS backend.
 
-Added
-~~~~~
-
-* Keyword arguments ``mtu`` and ``offset`` added for BlueZ backend read and write methods.
-* Keyword arguments ``mtu`` added for BlueZ backend notify methods. Added cleanup of these new kinds of notifications also.
 
 Changed
 ~~~~~~~
