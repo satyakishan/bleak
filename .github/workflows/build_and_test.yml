@@ -30,7 +30,7 @@ jobs:
             -   name: Install develoment dependencies
                 run: pip install -r requirements_dev.txt
             -   name: Check code formatting with black
-                run: black . --diff
+                run: black . --check
             -   name: Lint with flake8
                 run: |
                     # stop the build if there are Python syntax errors or undefined names
